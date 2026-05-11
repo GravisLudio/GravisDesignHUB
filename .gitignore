@@ -1,0 +1,32 @@
+# Build outputs
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# APK & extracted artifacts
+*.apk
+*.zip
+extracted_apk/
+
+# Reference screenshots
+*.jpeg
+*.jpg
+*.png
+!assets/**/*.png
+!assets/**/*.jpg
+
+# Local Claude config
+.claude/
