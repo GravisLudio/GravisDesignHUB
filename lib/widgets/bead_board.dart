@@ -127,41 +127,45 @@ class BeadBoard extends StatelessWidget {
       }
     }
 
-    // --- Step 2 (etapa 3): fill SINGLE rows on the RIGHT (X=1), weaving BOTTOM-UP.
-    //     Single rows are at Y=1, 3, 5, …, ending at Y=N-2 (where N is the number
-    //     of layout rows = n0). For 11-foundation, single rows: 1, 3, 5, 7, 9.
-    //     data[0] sits at the BOTTOM single row (closest to dorada).
-    if (currentStepIndex >= 2 && steps.length > 2) {
-      final step2 = steps[2].beads;
-      // Identify single row Y values from bottom up.
-      // For n0 beads layout: total rows = n0 - 1 (since top pair occupies Y=0).
-      // Single rows = odd Y from 1 to (n0 - 2).
-      final List<int> singleRowYs = [];
-      for (int y = 1; y < n0; y += 2) {
-        singleRowYs.add(y);
-      }
-      // Bottom single row = singleRowYs.last (highest Y).
-      // data[0] -> bottom; data[k] -> singleRowYs[singleRowYs.length - 1 - k].
-      for (int k = 0; k < step2.length; k++) {
-        final int idx = singleRowYs.length - 1 - k;
-        if (idx < 0) break;
-        final int targetRow = singleRowYs[idx];
-        // Step 3 beads sit at X=1.5 (right of singles at X=0.5, half-offset)
-        placements.add(_Placement(1.5, targetRow.toDouble(), step2[k]));
-      }
-    }
-
-    // --- Etapa 4+ : placeholder (new column to the right) until user confirms ---
-    for (int s = 3; s <= currentStepIndex && s < steps.length; s++) {
+    // --- Steps 3 and onwards: fill remaining columns following the alternating pattern ---
+    for (int s = 2; s <= currentStepIndex && s < steps.length; s++) {
       final beads = steps[s].beads;
       final int n = beads.length;
       if (n == 0) continue;
-      final double colX = 1.0 + (s - 2) * 0.85;
+
+      // Logic:
+      // Step 3 (s=2): Odd step -> fill half-number X (1.5) and Y (1, 3, 5...)
+      // Step 4 (s=3): Even step -> fill whole-number X (2.0) and Y (0, 2, 4...)
+      final bool isEvenStep = (s % 2 == 1); 
+      final double colX = 1.0 + (s - 1) * 0.5;
+      
+      // Determine Y positions for this column
+      final List<int> targetYs = [];
+      if (!isEvenStep) {
+        // Odd steps (s=2, 4...) -> Y = 1, 3, 5...
+        for (int y = 1; y < n0; y += 2) {
+          targetYs.add(y);
+        }
+      } else {
+        // Even steps (s=3, 5...) -> Y = 0, 2, 4...
+        for (int y = 0; y < n0; y += 2) {
+          targetYs.add(y);
+        }
+      }
+
+      // Weave direction (up/down) alternating
       final bool weavingDown = (s % 2 == 1);
       for (int i = 0; i < n; i++) {
-        final double y =
-            weavingDown ? i.toDouble() : (n - 1 - i).toDouble();
-        placements.add(_Placement(colX, y, beads[i]));
+        int targetIdx = weavingDown ? i : (targetYs.length - 1 - i);
+        if (targetIdx >= 0 && targetIdx < targetYs.length) {
+          final int targetY = targetYs[targetIdx];
+          
+          // IMPORTANT: Skip Y=0 ONLY for the foundation area (X=0 and X=1)
+          // Steps 4, 6... (s=3, 5...) at X=2.0, 3.0... CAN have beads at Y=0.
+          if (targetY == 0 && colX < 1.1) continue; 
+          
+          placements.add(_Placement(colX, targetY.toDouble(), beads[i]));
+        }
       }
     }
 

@@ -34,18 +34,19 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       for (final step in existing.steps) {
         final stepInput = StepInput();
         stepInput.noteController.text = step.note ?? '';
-        // Aggregate beads by color into BeadCounts
-        final Map<int, BeadCount> grouped = {};
+        
+        final List<BeadCount> beadCounts = [];
         for (final bead in step.beads) {
           if (bead.isEmpty || bead.beadColor == null) continue;
-          final argb = bead.beadColor!.color.value;
-          if (grouped.containsKey(argb)) {
-            grouped[argb]!.count++;
+          final color = bead.beadColor!.color;
+          
+          if (beadCounts.isNotEmpty && beadCounts.last.color.value == color.value) {
+            beadCounts.last.count++;
           } else {
-            grouped[argb] = BeadCount(color: bead.beadColor!.color, count: 1);
+            beadCounts.add(BeadCount(color: color, count: 1));
           }
         }
-        stepInput.beadCounts = grouped.values.toList();
+        stepInput.beadCounts = beadCounts;
         _steps.add(stepInput);
       }
       if (_steps.isEmpty) _steps.add(StepInput());
@@ -95,12 +96,22 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       'Verde': 'verde',
       'Café': 'café',
       'Rojo': 'roja',
+      'Rojo Oscuro': 'roja oscura',
       'Amarillo': 'amarilla',
       'Naranja': 'naranja',
       'Morado': 'morada',
       'Rosado': 'rosada',
       'Azul': 'azul',
+      'Azul Claro': 'azul clara',
+      'Azul Marino': 'azul marina',
       'Dorado': 'dorada',
+      'Plata': 'plata',
+      'Turquesa': 'turquesa',
+      'Esmeralda': 'esmeralda',
+      'Verde Lima': 'verde lima',
+      'Violeta': 'violeta',
+      'Fucsia': 'fucsia',
+      'Gris': 'gris',
     };
     final base = singularFem[bc.name] ?? bc.name.toLowerCase();
     if (count == 1) return base;
@@ -152,9 +163,9 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   void _addBeadToStep(int stepIndex, Color color) {
     setState(() {
       final step = _steps[stepIndex];
-      final existingIndex = step.beadCounts.indexWhere((bc) => bc.color.value == color.value);
-      if (existingIndex != -1) {
-        step.beadCounts[existingIndex].count++;
+      // Only group if the LAST entry in this step is the same color
+      if (step.beadCounts.isNotEmpty && step.beadCounts.last.color.value == color.value) {
+        step.beadCounts.last.count++;
       } else {
         step.beadCounts.add(BeadCount(color: color, count: 1));
       }
@@ -295,119 +306,183 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
         title: Text(_editingId != null ? 'EDITAR PATRÓN' : 'NUEVO PATRÓN'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
+          TextButton.icon(
             onPressed: _savePattern,
+            icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
+            label: const Text('LISTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildNameField(),
             const SizedBox(height: 24),
-            const Text(
-              'VISTA PREVIA DEL TEJIDO',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            _buildPreview(),
-            const SizedBox(height: 24),
+            _buildSectionHeader('VISTA PREVIA DEL TRABAJO'),
+            const SizedBox(height: 12),
+            _buildPreviewWorkstation(),
+            const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'PASOS',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
+                _buildSectionHeader('FLUJO DE PASOS'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_steps.length} ${_steps.length == 1 ? 'paso' : 'pasos'}',
+                    style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
-                Text('${_steps.length} ${_steps.length == 1 ? 'paso' : 'pasos'}'),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ..._steps.asMap().entries.map((entry) => _buildStepItem(entry.key, entry.value)),
             const SizedBox(height: 20),
             _buildAddStepButton(),
-            const SizedBox(height: 80),
+            const SizedBox(height: 100),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _savePattern,
-        icon: const Icon(Icons.save),
-        label: const Text('GUARDAR'),
+        icon: const Icon(Icons.save_rounded),
+        label: const Text('GUARDAR CAMBIOS', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  // Preview area: drag to pan, mouse wheel to zoom (only when hovering).
-  // Scroll events are consumed via PointerSignalResolver so the parent
-  // SingleChildScrollView does NOT scroll when wheel is over the preview.
-  Widget _buildPreview() {
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey[600],
+        letterSpacing: 1.2,
+      ),
+    );
+  }
+
+  Widget _buildPreviewWorkstation() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Responsive height: ~30% of screen height, min 200, max 320.
         final screenHeight = MediaQuery.of(context).size.height;
-        final double previewHeight = screenHeight * 0.30;
-        final double clampedHeight =
-            previewHeight.clamp(200.0, 320.0).toDouble();
+        final double clampedHeight = (screenHeight * 0.30).clamp(200.0, 320.0);
+        
         return Container(
           height: clampedHeight,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+            border: Border.all(color: Colors.white, width: 2),
           ),
           clipBehavior: Clip.hardEdge,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.grab,
-            child: Listener(
-              onPointerSignal: (event) {
-                if (event is PointerScrollEvent) {
-                  // Consume the event so the outer page does not scroll.
-                  GestureBinding.instance.pointerSignalResolver
-                      .register(event, (PointerSignalEvent ev) {
-                    final pe = ev as PointerScrollEvent;
-                    final delta = pe.scrollDelta.dy;
-                    // Scroll up (negative delta) -> zoom in. Down -> zoom out.
-                    final double factor = delta < 0 ? 1.1 : (1 / 1.1);
-                    final Matrix4 m = _previewController.value.clone();
-                    final Offset focal = pe.localPosition;
-                    m
-                      ..translate(focal.dx, focal.dy)
-                      ..scale(factor)
-                      ..translate(-focal.dx, -focal.dy);
-                    // Clamp scale between 0.3 and 5.0
-                    final double currentScale = m.getMaxScaleOnAxis();
-                    if (currentScale < 0.3 || currentScale > 5.0) return;
-                    _previewController.value = m;
-                  });
-                }
-              },
-              child: InteractiveViewer(
-                transformationController: _previewController,
-                scaleEnabled: false, // we handle zoom manually
-                panEnabled: true,
-                constrained: false,
-                boundaryMargin: const EdgeInsets.all(400),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: BeadBoard(
-                    steps: _getPatternSteps(),
-                    currentStepIndex: _steps.length - 1,
-                    beadSize: 30,
+          child: Stack(
+            children: [
+              // Subtle background grid pattern
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: GridPainter(color: Colors.grey.withOpacity(0.05)),
+                ),
+              ),
+              MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: Listener(
+                  onPointerSignal: (event) {
+                    if (event is PointerScrollEvent) {
+                      GestureBinding.instance.pointerSignalResolver.register(event, (PointerSignalEvent ev) {
+                        final pe = ev as PointerScrollEvent;
+                        final double factor = pe.scrollDelta.dy < 0 ? 1.1 : (1 / 1.1);
+                        final Matrix4 m = _previewController.value.clone();
+                        final Offset focal = pe.localPosition;
+                        m..translate(focal.dx, focal.dy)..scale(factor)..translate(-focal.dx, -focal.dy);
+                        if (m.getMaxScaleOnAxis() >= 0.3 && m.getMaxScaleOnAxis() <= 5.0) {
+                          _previewController.value = m;
+                        }
+                      });
+                    }
+                  },
+                  child: InteractiveViewer(
+                    transformationController: _previewController,
+                    scaleEnabled: false,
+                    panEnabled: true,
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(1000),
+                    alignment: Alignment.center,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(100),
+                        child: BeadBoard(
+                          steps: _getPatternSteps(),
+                          currentStepIndex: _steps.length - 1,
+                          beadSize: 35,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              // Controls overlay
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildMiniControl(Icons.zoom_in, () {
+                        _previewController.value = _previewController.value.clone()..scale(1.2);
+                      }),
+                      _buildMiniControl(Icons.zoom_out, () {
+                        _previewController.value = _previewController.value.clone()..scale(1/1.2);
+                      }),
+                      _buildMiniControl(Icons.center_focus_strong, () {
+                        _previewController.value = Matrix4.identity();
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMiniControl(IconData icon, VoidCallback onTap) {
+    return IconButton(
+      icon: Icon(icon, size: 18),
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      color: const Color(0xFF1A237E),
     );
   }
 
@@ -485,33 +560,59 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   Widget _buildBeadControl(int stepIndex, int beadIndex, BeadCount bc) {
     return Container(
       margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          BeadWidget(bead: Bead.colored(BeadColor('', '', bc.color)), size: 30),
-          const SizedBox(height: 4),
-          Text('${bc.count}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          BeadWidget(bead: Bead.colored(BeadColor('', '', bc.color)), size: 35),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A237E).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${bc.count}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.remove_circle_outline, size: 20),
-                onPressed: () => _updateBeadCount(stepIndex, beadIndex, -1),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.add_circle_outline, size: 20),
-                onPressed: () => _updateBeadCount(stepIndex, beadIndex, 1),
-              ),
+              _buildQtyBtn(Icons.remove_rounded, () => _updateBeadCount(stepIndex, beadIndex, -1)),
+              const SizedBox(width: 4),
+              _buildQtyBtn(Icons.add_rounded, () => _updateBeadCount(stepIndex, beadIndex, 1)),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQtyBtn(IconData icon, VoidCallback onTap) {
+    return Material(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Icon(icon, size: 18, color: const Color(0xFF1A237E)),
+        ),
       ),
     );
   }
@@ -565,4 +666,27 @@ class BeadCount {
   Color color;
   int count;
   BeadCount({required this.color, this.count = 1});
+}
+
+class GridPainter extends CustomPainter {
+  final Color color;
+  GridPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0;
+
+    const double spacing = 20.0;
+    for (double i = 0; i < size.width; i += spacing) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+    for (double i = 0; i < size.height; i += spacing) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

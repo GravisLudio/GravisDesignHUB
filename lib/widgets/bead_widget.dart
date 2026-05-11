@@ -31,34 +31,72 @@ class BeadWidget extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          center: const Alignment(-0.3, -0.3),
+          center: const Alignment(-0.4, -0.4),
           colors: [
-            bead.beadColor!.color.withOpacity(0.8),
-            bead.beadColor!.color,
             bead.beadColor!.color.withOpacity(0.9),
+            bead.beadColor!.color,
+            bead.beadColor!.color.withOpacity(0.8),
+            Color.lerp(bead.beadColor!.color, Colors.black, 0.2)!,
           ],
-          stops: const [0.0, 0.7, 1.0],
+          stops: const [0.0, 0.4, 0.8, 1.0],
         ),
         border: isLight
-            ? Border.all(color: Colors.grey.shade400, width: 1.2)
+            ? Border.all(color: Colors.grey.shade300, width: 0.8)
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 4,
-            offset: const Offset(2, 2),
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 5,
+            offset: const Offset(1.5, 2),
+            spreadRadius: 0.5,
           ),
         ],
       ),
-      child: Center(
-        child: Container(
-          width: size * 0.4,
-          height: size * 0.4,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            shape: BoxShape.circle,
+      child: Stack(
+        children: [
+          // Inner gloss/highlight
+          Positioned(
+            top: size * 0.15,
+            left: size * 0.15,
+            child: Container(
+              width: size * 0.35,
+              height: size * 0.35,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.4),
+                    Colors.white.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+          // Small reflection dot
+          Positioned(
+            top: size * 0.1,
+            left: size * 0.1,
+            child: Container(
+              width: size * 0.15,
+              height: size * 0.15,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.5),
+              ),
+            ),
+          ),
+          // Subtle hole in the middle (Peyote style)
+          Center(
+            child: Container(
+              width: size * 0.25,
+              height: size * 0.25,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black.withOpacity(0.15),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

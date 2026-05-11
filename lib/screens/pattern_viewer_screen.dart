@@ -234,10 +234,12 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
       minScale: 0.3,
       maxScale: 5.0,
       scaleEnabled: true,
-      boundaryMargin: const EdgeInsets.all(300),
+      constrained: false,
+      boundaryMargin: const EdgeInsets.all(1000),
+      alignment: Alignment.center,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(100),
           child: BeadBoard(
             steps: widget.pattern.steps,
             currentStepIndex: _currentStepIndex,
