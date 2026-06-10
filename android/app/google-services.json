@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "99804925924",
+    "project_id": "gravdesinghub",
+    "storage_bucket": "gravdesinghub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:99804925924:android:b7b250f8ef1703d0cb81f1",
+        "android_client_info": {
+          "package_name": "com.example.gravdesinghub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCasp9SYrSjvDd8-v-WxxDW3NrwjEAsmAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

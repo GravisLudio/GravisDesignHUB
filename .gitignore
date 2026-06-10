@@ -30,3 +30,4 @@ extracted_apk/
 
 # Local Claude config
 .claude/
+node_modules/

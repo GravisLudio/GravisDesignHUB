@@ -5,6 +5,8 @@ import '../models/bead_color.dart';
 import '../widgets/bead_widget.dart';
 import '../widgets/bead_board.dart';
 import '../models/bead.dart';
+import '../utils/currency_formatter.dart';
+import '../services/storage_service.dart';
 import 'add_pattern_screen.dart';
 
 class PatternViewerScreen extends StatefulWidget {
@@ -48,6 +50,34 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
     if (result == true && mounted) {
       // Pattern was modified: pop back to home so the list refreshes.
       Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _deletePattern() async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Patrón'),
+        content: Text('¿Estás seguro de que quieres eliminar "${widget.pattern.name}"? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCELAR'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await StorageService().deletePattern(widget.pattern.id);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
     }
   }
 
@@ -167,12 +197,27 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.pattern.name.toUpperCase()),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.pattern.name.toUpperCase()),
+            if (widget.pattern.price > 0)
+              Text(
+                formatCOP(widget.pattern.price),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal, color: Colors.white70),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Editar patrón',
             onPressed: _editPattern,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            tooltip: 'Eliminar patrón',
+            onPressed: _deletePattern,
           ),
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined),
@@ -181,14 +226,16 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildStepHeader(),
-          Expanded(
-            child: _buildBeadBoard(),
-          ),
-          _buildControls(),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildStepHeader(),
+            Expanded(
+              child: _buildBeadBoard(),
+            ),
+            _buildControls(),
+          ],
+        ),
       ),
     );
   }

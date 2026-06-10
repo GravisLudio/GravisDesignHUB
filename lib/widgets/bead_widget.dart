@@ -13,7 +13,7 @@ class BeadWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (bead.isEmpty || bead.beadColor == null) {
+    if (bead.isEmpty || bead.beadColor == null || bead.beadColor!.color == Colors.transparent) {
       return SizedBox(
         width: size,
         height: size,

@@ -19,6 +19,7 @@ class AddPatternScreen extends StatefulWidget {
 
 class _AddPatternScreenState extends State<AddPatternScreen> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
   final List<StepInput> _steps = [];
   final StorageService _storageService = StorageService();
   final TransformationController _previewController = TransformationController();
@@ -31,6 +32,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
     if (existing != null) {
       _editingId = existing.id;
       _nameController.text = existing.name;
+      _priceController.text = existing.price > 0 ? existing.price.round().toString() : '';
       for (final step in existing.steps) {
         final stepInput = StepInput();
         stepInput.noteController.text = step.note ?? '';
@@ -65,7 +67,8 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       final dr = preset.color.red - color.red;
       final dg = preset.color.green - color.green;
       final db = preset.color.blue - color.blue;
-      final dist = (dr * dr + dg * dg + db * db).toDouble();
+      final da = preset.color.alpha - color.alpha;
+      final dist = (dr * dr + dg * dg + db * db + da * da).toDouble();
       if (dist < bestDist) {
         bestDist = dist;
         closest = preset;
@@ -90,6 +93,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   // "Blanco"->"blancas", "Negro"->"negras", "Piel"->"pieles", "Rojo"->"rojas", etc.
   String _instructionNameFor(BeadColor bc, int count) {
     final Map<String, String> singularFem = {
+      'Vacío': 'vacío',
       'Blanco': 'blanca',
       'Negro': 'negra',
       'Piel': 'piel',
@@ -182,7 +186,8 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
     });
   }
 
-  Future<void> _pickColor(int stepIndex) async {
+  Future<void> _pickColor(int stepIndex, {int? editBeadIndex}) async {
+    FocusScope.of(context).unfocus(); // Prevent keyboard from popping up unexpectedly
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -216,7 +221,13 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
                 children: BeadColor.values.map((preset) {
                   return GestureDetector(
                     onTap: () {
-                      _addBeadToStep(stepIndex, preset.color);
+                      if (editBeadIndex != null) {
+                        setState(() {
+                          _steps[stepIndex].beadCounts[editBeadIndex].color = preset.color;
+                        });
+                      } else {
+                        _addBeadToStep(stepIndex, preset.color);
+                      }
                       Navigator.pop(ctx);
                     },
                     child: SizedBox(
@@ -228,22 +239,26 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: preset.color,
+                              color: preset.color == Colors.transparent ? Colors.grey.shade200 : preset.color,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: preset.color.computeLuminance() > 0.7
+                                color: (preset.color.computeLuminance() > 0.7 || preset.color == Colors.transparent)
                                     ? Colors.grey.shade400
                                     : Colors.transparent,
                                 width: 1.5,
                               ),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 3,
-                                  offset: const Offset(1, 2),
-                                ),
+                                if (preset.color != Colors.transparent)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 3,
+                                    offset: const Offset(1, 2),
+                                  ),
                               ],
                             ),
+                            child: preset.color == Colors.transparent
+                                ? Icon(Icons.block, color: Colors.grey.shade400, size: 20)
+                                : null,
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -289,12 +304,15 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       return;
     }
 
+    final price = double.tryParse(_priceController.text) ?? 0.0;
+
     final pattern = BeadPattern(
       id: _editingId ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text,
       steps: patternSteps,
       createdAt: widget.existingPattern?.createdAt ?? DateTime.now(),
       columns: patternSteps.length,
+      price: price,
     );
 
     await _storageService.savePattern(pattern);
@@ -318,12 +336,15 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildNameField(),
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildNameField(),
             const SizedBox(height: 24),
             _buildSectionHeader('VISTA PREVIA DEL TRABAJO'),
             const SizedBox(height: 12),
@@ -354,9 +375,11 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
             ..._steps.asMap().entries.map((entry) => _buildStepItem(entry.key, entry.value)),
             const SizedBox(height: 20),
             _buildAddStepButton(),
-            const SizedBox(height: 100),
-          ],
+              const SizedBox(height: 100),
+            ],
+          ),
         ),
+      ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _savePattern,
@@ -487,18 +510,38 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   }
 
   Widget _buildNameField() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(
-            icon: Icon(Icons.palette),
-            hintText: 'Nombre del patrón (ej: HELLO KITTY)',
-            border: InputBorder.none,
+    return Column(
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                icon: Icon(Icons.palette),
+                hintText: 'Nombre del patrón (ej: HELLO KITTY)',
+                border: InputBorder.none,
+              ),
+              textCapitalization: TextCapitalization.characters,
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: TextField(
+              controller: _priceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                icon: Icon(Icons.monetization_on_rounded),
+                hintText: 'Precio sugerido en pesos (COP) (ej: 30000)',
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -575,7 +618,10 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       ),
       child: Column(
         children: [
-          BeadWidget(bead: Bead.colored(BeadColor('', '', bc.color)), size: 35),
+          GestureDetector(
+            onTap: () => _pickColor(stepIndex, editBeadIndex: beadIndex),
+            child: BeadWidget(bead: Bead.colored(BeadColor('', '', bc.color)), size: 35),
+          ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),

@@ -7,6 +7,9 @@ class BeadColor {
 
   const BeadColor(this.code, this.name, this.color);
 
+  // Special
+  static const vacio = BeadColor('X', 'Vacío', Colors.transparent);
+
   // Preset colors
   static const dorado = BeadColor('D', 'Dorado', Color(0xFFC8A951));
   static const plata = BeadColor('SL', 'Plata', Color(0xFFBDBDBD));
@@ -40,6 +43,7 @@ class BeadColor {
   static const fucsia = BeadColor('F', 'Fucsia', Color(0xFFE91E63));
 
   static List<BeadColor> get values => [
+    vacio,
     dorado, plata, negro, piel, cafe, blanco, gris,
     rojo, rojoOscuro, naranja, amarillo,
     verde, verdeLima, verdeEsmeralda,

@@ -24,13 +24,14 @@ class BeadBoard extends StatelessWidget {
     final placements = _computePlacements();
     if (placements.isEmpty) return const SizedBox.shrink();
 
-    double maxX = 0, maxY = 0;
+    double maxX = 0, maxY = 0, minX = 0;
     for (final p in placements) {
       if (p.x > maxX) maxX = p.x;
+      if (p.x < minX) minX = p.x;
       if (p.y > maxY) maxY = p.y;
     }
 
-    final double totalWidth = maxX * beadSize + beadSize;
+    final double totalWidth = (maxX - minX) * beadSize + beadSize;
     final double totalHeight = maxY * beadSize + beadSize;
 
     return SizedBox(
@@ -41,7 +42,7 @@ class BeadBoard extends StatelessWidget {
         children: [
           for (final p in placements)
             Positioned(
-              left: p.x * beadSize,
+              left: (p.x - minX) * beadSize,
               top: p.y * beadSize,
               child: BeadWidget(bead: p.bead, size: beadSize),
             ),
@@ -128,16 +129,25 @@ class BeadBoard extends StatelessWidget {
     }
 
     // --- Steps 3 and onwards: fill remaining columns following the alternating pattern ---
+    int rightColIndex = 2; // Represents the visual column on the right
+    int leftColIndex = 2;  // Represents the visual column on the left
+    
     for (int s = 2; s <= currentStepIndex && s < steps.length; s++) {
-      final beads = steps[s].beads;
+      final step = steps[s];
+      final beads = step.beads;
       final int n = beads.length;
       if (n == 0) continue;
 
+      bool isLeft = step.note == 'LEFT_SIDE';
+      int validColIndex = isLeft ? leftColIndex : rightColIndex;
+
       // Logic:
-      // Step 3 (s=2): Odd step -> fill half-number X (1.5) and Y (1, 3, 5...)
-      // Step 4 (s=3): Even step -> fill whole-number X (2.0) and Y (0, 2, 4...)
-      final bool isEvenStep = (s % 2 == 1); 
-      final double colX = 1.0 + (s - 1) * 0.5;
+      // Step 3 (validColIndex=2): Odd step -> fill half-number X (1.5 or -0.5) and Y (1, 3, 5...)
+      // Step 4 (validColIndex=3): Even step -> fill whole-number X (2.0 or -1.0) and Y (0, 2, 4...)
+      final bool isEvenStep = (validColIndex % 2 == 1); 
+      final double colX = isLeft 
+          ? 0.0 - (validColIndex - 1) * 0.5
+          : 1.0 + (validColIndex - 1) * 0.5;
       
       // Determine Y positions for this column
       final List<int> targetYs = [];
@@ -154,18 +164,24 @@ class BeadBoard extends StatelessWidget {
       }
 
       // Weave direction (up/down) alternating
-      final bool weavingDown = (s % 2 == 1);
+      final bool weavingDown = (validColIndex % 2 == 1);
       for (int i = 0; i < n; i++) {
         int targetIdx = weavingDown ? i : (targetYs.length - 1 - i);
         if (targetIdx >= 0 && targetIdx < targetYs.length) {
           final int targetY = targetYs[targetIdx];
           
           // IMPORTANT: Skip Y=0 ONLY for the foundation area (X=0 and X=1)
-          // Steps 4, 6... (s=3, 5...) at X=2.0, 3.0... CAN have beads at Y=0.
-          if (targetY == 0 && colX < 1.1) continue; 
+          // Steps 4, 6... (validColIndex=3, 5...) at X=2.0, 3.0... CAN have beads at Y=0.
+          if (targetY == 0 && colX > -0.1 && colX < 1.1) continue; 
           
           placements.add(_Placement(colX, targetY.toDouble(), beads[i]));
         }
+      }
+      
+      if (isLeft) {
+        leftColIndex++;
+      } else {
+        rightColIndex++;
       }
     }
 

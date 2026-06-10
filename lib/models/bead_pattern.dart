@@ -6,6 +6,7 @@ class BeadPattern {
   final List<PatternStep> steps;
   final DateTime createdAt;
   final int columns;
+  final double price;
 
   BeadPattern({
     required this.id,
@@ -13,6 +14,7 @@ class BeadPattern {
     required this.steps,
     required this.createdAt,
     this.columns = 2,
+    this.price = 0.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -21,6 +23,7 @@ class BeadPattern {
     'steps': steps.map((s) => s.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'columns': columns,
+    'price': price,
   };
 
   factory BeadPattern.fromJson(Map<String, dynamic> json) {
@@ -30,6 +33,7 @@ class BeadPattern {
       steps: (json['steps'] as List?)?.map((s) => PatternStep.fromJson(s)).toList() ?? [],
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       columns: json['columns'] ?? 2,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
