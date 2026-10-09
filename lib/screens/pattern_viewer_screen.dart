@@ -21,6 +21,7 @@ class PatternViewerScreen extends StatefulWidget {
 class _PatternViewerScreenState extends State<PatternViewerScreen> {
   int _currentStepIndex = 0;
   double _zoomScale = 1.0;
+  bool _showThreadGuide = false;
 
   PatternStep get _currentStep => widget.pattern.steps[_currentStepIndex];
 
@@ -241,6 +242,7 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
   }
 
   Widget _buildStepHeader() {
+    final isPeyote = widget.pattern.patternType == 'peyote';
     return Container(
       width: double.infinity,
       color: const Color(0xFFFFF9C4).withOpacity(0.5),
@@ -248,7 +250,9 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
       child: Column(
         children: [
           Text(
-            'ETAPA ${_currentStepIndex + 1} / ${widget.pattern.steps.length}',
+            isPeyote
+                ? 'ETAPA ${_currentStepIndex + 1} / ${widget.pattern.steps.length}'
+                : 'FILA ${_currentStepIndex + 1} / ${widget.pattern.steps.length}',
             style: const TextStyle(
               color: Color(0xFF1A237E),
               fontWeight: FontWeight.bold,
@@ -291,6 +295,8 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
             steps: widget.pattern.steps,
             currentStepIndex: _currentStepIndex,
             beadSize: 40,
+            patternType: widget.pattern.patternType,
+            showThreadGuide: _showThreadGuide,
           ),
         ),
       ),
@@ -313,6 +319,59 @@ class _PatternViewerScreenState extends State<PatternViewerScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'MODO VISUAL',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[500],
+                  letterSpacing: 1.0,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ChoiceChip(
+                    label: const Text('PASO A PASO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    selected: !_showThreadGuide,
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() {
+                          _showThreadGuide = false;
+                        });
+                      }
+                    },
+                    selectedColor: const Color(0xFF1A237E).withOpacity(0.12),
+                    labelStyle: TextStyle(
+                      color: !_showThreadGuide ? const Color(0xFF1A237E) : Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('GUÍA DE HILO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    selected: _showThreadGuide,
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() {
+                          _showThreadGuide = true;
+                        });
+                      }
+                    },
+                    selectedColor: Colors.amber.shade100,
+                    labelStyle: TextStyle(
+                      color: _showThreadGuide ? Colors.amber.shade900 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
           Slider(
             value: _currentStepIndex.toDouble(),
             min: 0,

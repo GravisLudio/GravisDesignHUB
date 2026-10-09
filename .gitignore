@@ -31,3 +31,9 @@ extracted_apk/
 # Local Claude config
 .claude/
 node_modules/
+
+# Generados localmente
+graphify-out/
+android/.kotlin/
+release/
+flutter_*.log

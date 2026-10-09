@@ -7,6 +7,7 @@ class BeadPattern {
   final DateTime createdAt;
   final int columns;
   final double price;
+  final String patternType; // 'peyote' (default), 'loom', 'brick', 'flower'
 
   BeadPattern({
     required this.id,
@@ -15,6 +16,7 @@ class BeadPattern {
     required this.createdAt,
     this.columns = 2,
     this.price = 0.0,
+    this.patternType = 'peyote',
   });
 
   Map<String, dynamic> toJson() => {
@@ -24,6 +26,7 @@ class BeadPattern {
     'createdAt': createdAt.toIso8601String(),
     'columns': columns,
     'price': price,
+    'patternType': patternType,
   };
 
   factory BeadPattern.fromJson(Map<String, dynamic> json) {
@@ -34,6 +37,8 @@ class BeadPattern {
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
       columns: json['columns'] ?? 2,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      patternType: json['patternType'] ?? 'peyote',
     );
   }
 }
+

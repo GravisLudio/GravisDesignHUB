@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/bead.dart';
 import '../models/pattern_step.dart';
@@ -7,12 +8,16 @@ class BeadBoard extends StatelessWidget {
   final List<PatternStep> steps;
   final int currentStepIndex;
   final double beadSize;
+  final String patternType; // 'peyote', 'loom', 'brick', 'flower'
+  final bool showThreadGuide;
 
   const BeadBoard({
     super.key,
     required this.steps,
     required this.currentStepIndex,
     this.beadSize = 40.0,
+    this.patternType = 'peyote',
+    this.showThreadGuide = false,
   });
 
   @override
@@ -24,15 +29,21 @@ class BeadBoard extends StatelessWidget {
     final placements = _computePlacements();
     if (placements.isEmpty) return const SizedBox.shrink();
 
-    double maxX = 0, maxY = 0, minX = 0;
+    double maxX = -double.infinity, maxY = -double.infinity;
+    double minX = double.infinity, minY = double.infinity;
     for (final p in placements) {
       if (p.x > maxX) maxX = p.x;
       if (p.x < minX) minX = p.x;
       if (p.y > maxY) maxY = p.y;
+      if (p.y < minY) minY = p.y;
+    }
+
+    if (maxX == -double.infinity) {
+      maxX = 0; minX = 0; maxY = 0; minY = 0;
     }
 
     final double totalWidth = (maxX - minX) * beadSize + beadSize;
-    final double totalHeight = maxY * beadSize + beadSize;
+    final double totalHeight = (maxY - minY) * beadSize + beadSize;
 
     return SizedBox(
       width: totalWidth,
@@ -40,149 +51,126 @@ class BeadBoard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // 1. Render all placed beads
           for (final p in placements)
             Positioned(
               left: (p.x - minX) * beadSize,
-              top: p.y * beadSize,
-              child: BeadWidget(bead: p.bead, size: beadSize),
+              top: (p.y - minY) * beadSize,
+              child: Transform.rotate(
+                angle: p.angle,
+                child: BeadWidget(bead: p.bead, size: beadSize),
+              ),
+            ),
+          // 2. Render thread guide on top if requested
+          if (showThreadGuide)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: ThreadGuidePainter(
+                  placements: placements,
+                  currentStepIndex: currentStepIndex,
+                  patternType: patternType,
+                  beadSize: beadSize,
+                  minX: minX,
+                  minY: minY,
+                ),
+              ),
             ),
         ],
       ),
     );
   }
 
-  // Peyote rendering model (matches user's reference app):
-  //
-  // Etapa 1 (currentStepIndex == 0):
-  //   Foundation rendered as a single vertical column.
-  //   data[N-1] at top (Y=0), data[0] at bottom (Y=N-1).
-  //
-  // Etapa 2+ (currentStepIndex >= 1): "se devuelve" reshapes the foundation:
-  //   Row 0 (top): a PAIR of beads at X=0 and X=1
-  //     - data[N-1] at (X=0, Y=0)
-  //     - data[N-2] at (X=1, Y=0)
-  //   Below the top pair, the remaining N-2 beads alternate SINGLE / PARTIAL_PAIR rows:
-  //     - Row 1, 3, 5, … (odd): SINGLE bead at X=0.5 (centered)
-  //     - Row 2, 4, 6, … (even): PARTIAL PAIR — foundation bead at X=0 (LEFT)
-  //   Going top→down: data[N-3], data[N-4], data[N-5], … data[0]
-  //   data[0] sits at the bottom-most single row (centered).
-  //
-  // Step 1's beads (etapa 2) fill the partial-pair rows on the RIGHT (X=1):
-  //   Step 1 weaves TOP-DOWN (user's convention): data[0] is the topmost added.
-  //   data[0] at the top partial-pair row (Y=2)
-  //   data[1] at the next partial-pair row (Y=4)
-  //   data[2] at Y=6, data[3] at Y=8, …
-  //
-  // (Step S >= 2 handling: TBD, left as a new column for now until user confirms.)
   List<_Placement> _computePlacements() {
     final placements = <_Placement>[];
     if (steps.isEmpty) return placements;
 
-    final foundation = steps[0].beads;
-    final int n0 = foundation.length;
+    // --- Type: peyote (Miyuki classic vertical staggered) ---
+    if (patternType == 'peyote') {
+      final foundation = steps[0].beads;
+      final int n0 = foundation.length;
 
-    // --- Etapa 1: single vertical column ---
-    if (currentStepIndex == 0) {
-      for (int i = 0; i < n0; i++) {
-        placements.add(_Placement(0.0, (n0 - 1 - i).toDouble(), foundation[i]));
+      // Etapa 1: single vertical column
+      if (currentStepIndex == 0) {
+        for (int i = 0; i < n0; i++) {
+          placements.add(_Placement(0.0, (n0 - 1 - i).toDouble(), foundation[i], 0, i, angle: pi / 2));
+        }
+        return placements;
+      }
+
+      // Etapa 2+: zigzag with top pair, alternating single/partial-pair rows
+      if (n0 >= 2) {
+        placements.add(_Placement(0.0, 0.0, foundation[n0 - 2], 0, n0 - 2, angle: pi / 2));
+        placements.add(_Placement(1.0, 0.0, foundation[n0 - 1], 0, n0 - 1, angle: pi / 2));
+      } else if (n0 == 1) {
+        placements.add(_Placement(0.0, 0.0, foundation[0], 0, 0, angle: pi / 2));
+      }
+
+      const double singleX = 0.5;
+      int row = 1;
+      for (int j = 0; j < n0 - 2; j++) {
+        final Bead bead = foundation[n0 - 3 - j];
+        if (row % 2 == 1) {
+          placements.add(_Placement(singleX, row.toDouble(), bead, 0, n0 - 3 - j, angle: pi / 2));
+        } else {
+          placements.add(_Placement(0.0, row.toDouble(), bead, 0, n0 - 3 - j, angle: pi / 2));
+        }
+        row++;
+      }
+
+      // Step 1 (etapa 2)
+      if (currentStepIndex >= 1 && steps.length > 1) {
+        final step1 = steps[1].beads;
+        for (int k = 0; k < step1.length; k++) {
+          final int targetRow = 2 + k * 2;
+          placements.add(_Placement(1.0, targetRow.toDouble(), step1[k], 1, k, angle: pi / 2));
+        }
+      }
+
+      // Steps 2 and onwards
+      int rightColIndex = 2;
+      int leftColIndex = 2;
+
+      for (int s = 2; s <= currentStepIndex && s < steps.length; s++) {
+        final step = steps[s];
+        final beads = step.beads;
+        final int n = beads.length;
+        if (n == 0) continue;
+
+        bool isLeft = step.note == 'LEFT_SIDE';
+        int validColIndex = isLeft ? leftColIndex : rightColIndex;
+        final bool isEvenStep = (validColIndex % 2 == 1);
+        final double colX = isLeft 
+            ? 0.0 - (validColIndex - 1) * 0.5
+            : 1.0 + (validColIndex - 1) * 0.5;
+
+        final List<int> targetYs = [];
+        if (!isEvenStep) {
+          for (int y = 1; y < n0; y += 2) {
+            targetYs.add(y);
+          }
+        } else {
+          for (int y = 0; y < n0; y += 2) {
+            targetYs.add(y);
+          }
+        }
+
+        final bool weavingDown = (validColIndex % 2 == 1);
+        for (int i = 0; i < n; i++) {
+          int targetIdx = weavingDown ? i : (targetYs.length - 1 - i);
+          if (targetIdx >= 0 && targetIdx < targetYs.length) {
+            final int targetY = targetYs[targetIdx];
+            if (targetY == 0 && colX > -0.1 && colX < 1.1) continue;
+            placements.add(_Placement(colX, targetY.toDouble(), beads[i], s, i, angle: pi / 2));
+          }
+        }
+
+        if (isLeft) {
+          leftColIndex++;
+        } else {
+          rightColIndex++;
+        }
       }
       return placements;
-    }
-
-    // --- Etapa 2+: zigzag with top pair, alternating single/partial-pair rows ---
-    if (n0 >= 1) {
-      // Top pair LEFT (Y=0, X=0)
-      placements.add(_Placement(0.0, 0.0, foundation[n0 - 1]));
-    }
-    if (n0 >= 2) {
-      // Top pair RIGHT (Y=0, X=1)
-      placements.add(_Placement(1.0, 0.0, foundation[n0 - 2]));
-    }
-
-    // Foundation single beads ALWAYS stay at X=0.5 (centered).
-    // Step 3 beads, when present, sit at X=1.5 (right of singles, half-offset).
-    const double singleX = 0.5;
-
-    // Remaining N-2 foundation beads: alternate SINGLE and PARTIAL_PAIR rows.
-    // First remaining bead goes to Y=1 (SINGLE row).
-    int row = 1;
-    for (int j = 0; j < n0 - 2; j++) {
-      final Bead bead = foundation[n0 - 3 - j];
-      if (row % 2 == 1) {
-        // odd row -> single, centered at X=0.5
-        placements.add(_Placement(singleX, row.toDouble(), bead));
-      } else {
-        // even row (>=2) -> partial pair, foundation on LEFT
-        placements.add(_Placement(0.0, row.toDouble(), bead));
-      }
-      row++;
-    }
-
-    // --- Step 1 (etapa 2): fill partial-pair rows on the RIGHT (X=1) ---
-    if (currentStepIndex >= 1 && steps.length > 1) {
-      final step1 = steps[1].beads;
-      // Partial-pair rows start at Y=2 and step by 2 (Y=2, 4, 6, …)
-      for (int k = 0; k < step1.length; k++) {
-        final int targetRow = 2 + k * 2;
-        placements.add(_Placement(1.0, targetRow.toDouble(), step1[k]));
-      }
-    }
-
-    // --- Steps 3 and onwards: fill remaining columns following the alternating pattern ---
-    int rightColIndex = 2; // Represents the visual column on the right
-    int leftColIndex = 2;  // Represents the visual column on the left
-    
-    for (int s = 2; s <= currentStepIndex && s < steps.length; s++) {
-      final step = steps[s];
-      final beads = step.beads;
-      final int n = beads.length;
-      if (n == 0) continue;
-
-      bool isLeft = step.note == 'LEFT_SIDE';
-      int validColIndex = isLeft ? leftColIndex : rightColIndex;
-
-      // Logic:
-      // Step 3 (validColIndex=2): Odd step -> fill half-number X (1.5 or -0.5) and Y (1, 3, 5...)
-      // Step 4 (validColIndex=3): Even step -> fill whole-number X (2.0 or -1.0) and Y (0, 2, 4...)
-      final bool isEvenStep = (validColIndex % 2 == 1); 
-      final double colX = isLeft 
-          ? 0.0 - (validColIndex - 1) * 0.5
-          : 1.0 + (validColIndex - 1) * 0.5;
-      
-      // Determine Y positions for this column
-      final List<int> targetYs = [];
-      if (!isEvenStep) {
-        // Odd steps (s=2, 4...) -> Y = 1, 3, 5...
-        for (int y = 1; y < n0; y += 2) {
-          targetYs.add(y);
-        }
-      } else {
-        // Even steps (s=3, 5...) -> Y = 0, 2, 4...
-        for (int y = 0; y < n0; y += 2) {
-          targetYs.add(y);
-        }
-      }
-
-      // Weave direction (up/down) alternating
-      final bool weavingDown = (validColIndex % 2 == 1);
-      for (int i = 0; i < n; i++) {
-        int targetIdx = weavingDown ? i : (targetYs.length - 1 - i);
-        if (targetIdx >= 0 && targetIdx < targetYs.length) {
-          final int targetY = targetYs[targetIdx];
-          
-          // IMPORTANT: Skip Y=0 ONLY for the foundation area (X=0 and X=1)
-          // Steps 4, 6... (validColIndex=3, 5...) at X=2.0, 3.0... CAN have beads at Y=0.
-          if (targetY == 0 && colX > -0.1 && colX < 1.1) continue; 
-          
-          placements.add(_Placement(colX, targetY.toDouble(), beads[i]));
-        }
-      }
-      
-      if (isLeft) {
-        leftColIndex++;
-      } else {
-        rightColIndex++;
-      }
     }
 
     return placements;
@@ -193,5 +181,114 @@ class _Placement {
   final double x;
   final double y;
   final Bead bead;
-  _Placement(this.x, this.y, this.bead);
+  final int stepIndex;
+  final int beadIndex;
+  final double angle;
+
+  _Placement(this.x, this.y, this.bead, this.stepIndex, this.beadIndex, {this.angle = 0.0});
+}
+
+class ThreadGuidePainter extends CustomPainter {
+  final List<_Placement> placements;
+  final int currentStepIndex;
+  final String patternType;
+  final double beadSize;
+  final double minX;
+  final double minY;
+
+  ThreadGuidePainter({
+    required this.placements,
+    required this.currentStepIndex,
+    required this.patternType,
+    required this.beadSize,
+    required this.minX,
+    required this.minY,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final currentPlacements = placements
+        .where((p) => p.stepIndex == currentStepIndex)
+        .toList()
+      ..sort((a, b) => a.beadIndex.compareTo(b.beadIndex));
+
+    if (currentPlacements.isEmpty) return;
+
+    final paintThread = Paint()
+      ..color = Colors.black.withOpacity(0.7)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    Offset getBeadOffset(_Placement p) {
+      return Offset(
+        (p.x - minX) * beadSize + beadSize / 2,
+        (p.y - minY) * beadSize + beadSize / 2,
+      );
+    }
+
+    // Peyote
+    for (int i = 0; i < currentPlacements.length; i++) {
+      final p = currentPlacements[i];
+      final center = getBeadOffset(p);
+
+      if (i == 0) {
+        canvas.drawLine(center - Offset(0, beadSize * 0.5), center, paintThread);
+      } else {
+        final prevCenter = getBeadOffset(currentPlacements[i - 1]);
+        canvas.drawLine(prevCenter, center, paintThread);
+      }
+
+      if (i == currentPlacements.length - 1) {
+        _drawNeedle(canvas, center + Offset(0, beadSize * 0.4), const Offset(0, 1));
+      }
+    }
+  }
+
+  void _drawNeedle(Canvas canvas, Offset position, Offset dir) {
+    final angle = atan2(dir.dy, dir.dx);
+    canvas.save();
+    canvas.translate(position.dx, position.dy);
+    canvas.rotate(angle);
+
+    final needlePaint = Paint()
+      ..color = Colors.grey.shade600
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final eyePaint = Paint()
+      ..color = Colors.amber.shade700
+      ..style = PaintingStyle.fill;
+
+    canvas.drawLine(const Offset(-25, 0), const Offset(0, 0), needlePaint);
+    final pathPoint = Path()
+      ..moveTo(0, 0)
+      ..lineTo(-5, -2)
+      ..lineTo(-5, 2)
+      ..close();
+    canvas.drawPath(pathPoint, Paint()..color = Colors.grey.shade600..style = PaintingStyle.fill);
+
+    canvas.drawCircle(const Offset(-22, 0), 1.5, eyePaint);
+
+    final threadTailPaint = Paint()
+      ..color = Colors.black.withOpacity(0.5)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final tailPath = Path()
+      ..moveTo(-22, 0)
+      ..cubicTo(-28, -5, -30, 5, -36, 0);
+    canvas.drawPath(tailPath, threadTailPaint);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant ThreadGuidePainter oldDelegate) =>
+      oldDelegate.currentStepIndex != currentStepIndex ||
+      oldDelegate.patternType != patternType ||
+      oldDelegate.beadSize != beadSize ||
+      oldDelegate.minX != minX ||
+      oldDelegate.minY != minY ||
+      oldDelegate.placements.length != placements.length;
 }

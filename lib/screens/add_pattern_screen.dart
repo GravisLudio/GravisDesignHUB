@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/bead_pattern.dart';
 import '../models/pattern_step.dart';
 import '../models/bead_color.dart';
@@ -24,6 +25,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   final StorageService _storageService = StorageService();
   final TransformationController _previewController = TransformationController();
   String? _editingId;
+  String _patternType = 'peyote';
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       _editingId = existing.id;
       _nameController.text = existing.name;
       _priceController.text = existing.price > 0 ? existing.price.round().toString() : '';
+      _patternType = existing.patternType;
       for (final step in existing.steps) {
         final stepInput = StepInput();
         stepInput.noteController.text = step.note ?? '';
@@ -162,6 +165,79 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
         _steps.removeAt(index);
       });
     }
+  }
+
+  void _duplicateStep(int index, int count) {
+    if (count <= 0) return;
+    setState(() {
+      final original = _steps[index];
+      final copies = List.generate(count, (_) {
+        final newStep = StepInput();
+        newStep.beadCounts = original.beadCounts.map((bc) => BeadCount(
+          color: bc.color,
+          count: bc.count,
+        )).toList();
+        newStep.noteController.text = original.noteController.text;
+        return newStep;
+      });
+      _steps.insertAll(index + 1, copies);
+    });
+  }
+
+  void _showMultiplyDialog(int index) {
+    final TextEditingController multiplierCtrl = TextEditingController(text: '1');
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Multiplicar Paso',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '¿Cuántas veces deseas duplicar este paso?',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: multiplierCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Número de repeticiones',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCELAR', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final int count = int.tryParse(multiplierCtrl.text) ?? 0;
+                if (count > 0) {
+                  _duplicateStep(index, count);
+                }
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A237E),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('MULTIPLICAR', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _addBeadToStep(int stepIndex, Color color) {
@@ -313,6 +389,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       createdAt: widget.existingPattern?.createdAt ?? DateTime.now(),
       columns: patternSteps.length,
       price: price,
+      patternType: _patternType,
     );
 
     await _storageService.savePattern(pattern);
@@ -345,32 +422,65 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildNameField(),
-            const SizedBox(height: 24),
-            _buildSectionHeader('VISTA PREVIA DEL TRABAJO'),
-            const SizedBox(height: 12),
-            _buildPreviewWorkstation(),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSectionHeader('FLUJO DE PASOS'),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                const SizedBox(height: 24),
+
+                _buildSectionHeader('VISTA PREVIA DEL TRABAJO'),
+                const SizedBox(height: 12),
+                _buildPreviewWorkstation(),
+                const SizedBox(height: 24),
+                Card(
+                  color: Colors.blue.shade50,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.blue.shade200, width: 0.8),
                   ),
-                  child: Text(
-                    '${_steps.length} ${_steps.length == 1 ? 'paso' : 'pasos'}',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '💡 Consejo: Por cada pepa que necesites en un extremo añade dos pasos (ej: si necesitas 30 en un lado, serán 60 pasos).',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade900,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSectionHeader(
+                      _patternType == 'peyote' ? 'FLUJO DE PASOS' : 'FLUJO DE FILAS',
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _patternType == 'peyote'
+                            ? '${_steps.length} ${_steps.length == 1 ? 'paso' : 'pasos'}'
+                            : '${_steps.length} ${_steps.length == 1 ? 'fila' : 'filas'}',
+                        style: TextStyle(
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             const SizedBox(height: 16),
             ..._steps.asMap().entries.map((entry) => _buildStepItem(entry.key, entry.value)),
             const SizedBox(height: 20),
@@ -462,6 +572,7 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
                           steps: _getPatternSteps(),
                           currentStepIndex: _steps.length - 1,
                           beadSize: 35,
+                          patternType: _patternType,
                         ),
                       ),
                     ),
@@ -563,15 +674,39 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Paso ${index + 1}',
+                    _patternType == 'peyote'
+                        ? 'Paso ${index + 1}'
+                        : _patternType == 'flower'
+                            ? (index == 0 ? 'Fila 1: Centro (Anillo)' : 'Fila ${index + 1}: Pétalos')
+                            : 'Fila ${index + 1}',
                     style: const TextStyle(color: Color(0xFF1A237E), fontWeight: FontWeight.bold),
                   ),
                 ),
-                if (_steps.length > 1)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () => _removeStep(index),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _showMultiplyDialog(index),
+                      icon: const Icon(Icons.copy_rounded, size: 16, color: Color(0xFF1A237E)),
+                      label: const Text(
+                        'MULTIPLICAR',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A237E),
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                    if (_steps.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _removeStep(index),
+                      ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -687,12 +822,20 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
   }
 
   Widget _buildAddStepButton() {
+    final bool isCircular = _patternType == 'flower';
+    final bool isRowBased = _patternType == 'loom' || _patternType == 'brick';
+    String label = 'AGREGAR PASO';
+    if (isCircular) {
+      label = _steps.isEmpty ? 'AGREGAR CENTRO' : 'AGREGAR CAPA / PÉTALOS';
+    } else if (isRowBased) {
+      label = 'AGREGAR FILA';
+    }
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: _addStep,
         icon: const Icon(Icons.add),
-        label: const Text('AGREGAR PASO'),
+        label: Text(label),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           side: const BorderSide(color: Color(0xFF1A237E)),
@@ -701,6 +844,8 @@ class _AddPatternScreenState extends State<AddPatternScreen> {
       ),
     );
   }
+
+
 }
 
 class StepInput {
